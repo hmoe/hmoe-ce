@@ -12,6 +12,8 @@ var connection = mysql.createConnection({
 });
 connection.connect();
 
+"use strict"
+
 var APPKEY = 'ba3a4e554e9a6e15dc4d1d70c2b154e3';
 
 var req = [
@@ -54,28 +56,59 @@ var midList = [];//用户ID的列表
 var aidList = [];
 var downloadNum = 0;
 
+function saveVideoToDB(o,aid,callback,l){
+	
+	async.series([
+		function(cb){
+			connection.query("REPLACE INTO video (`aid`,`mid`,`title`,`description`,`created`,`pic`) VALUES (?,?,?,?,?,?);",
+			[aid,o.mid,o.title,o.description,o.created_at,o.pic]
+			,function(err,rows){
+				cb();
+				if(err){
+					console.log(err);
+					console.log(o)
+					console.log('写入视频数据出错：'+aid);
+				}
+			});
+		},
+		function(cb){
+			connection.query("REPLACE INTO video_history (`aid`,`ts`,`play`,`review`,`video_review`,`favorites`,`coins`,`credit`) VALUES (?,NOW(),?,?,?,?,?,?)",
+			[aid,o.play,o.review,o.video_review,o.favorites,o.coins,o.credit],
+			function(err,rows){
+				cb();
+				if(err){
+					console.log(err);
+					console.log(o)
+					console.log('写入视频数据出错：'+aid);
+				}
+			})	
+		}
+	],function(err,results){
+		callback();
+		return;
+	});
+	
+}	
+
 function updateVideos(callback){
 	if(aidList.length<=0){
+		connection.end();
+		console.log('已经关闭到数据库的连接');
 		callback();
 		return;
 	}
 	
-	if(downloadNum++%8==0){
-		setTimeout(updateVideos,3500,callback);
-	}else{
-		setTimeout(updateVideos,100,callback);
-	}
+	var refreshed = false;
 	
-	
-	var a = aidList.pop();
-	var aid = a.aid;
-	
-	request({
-		'url':'http://api.bilibili.com/view'+createUrl(req,aid),
-	},function (err, response, body) {
-		try{
-			var o = JSON.parse(body);
-			if(o.code && o.code=='-403'){
+	async.series([
+		function(cb){
+			var a = aidList.pop();
+			var aid = a.aid;
+			var dd = new Date().getTime() - Date.parse(a.created);
+			
+			//如果投稿日期超过一个星期，有98%的概率不更新
+			if(( dd > 1000*3600*24*7)&&Math.floor(Math.random()*50)!=0){
+				var o = new Object();
 				o.mid = a.mid;
 				o.title = a.title;
 				o.description = a.description;
@@ -86,31 +119,71 @@ function updateVideos(callback){
 				o.video_review = a.video_review;
 				o.favorites = a.favorites;
 				o.coins = 0;
+				o.credit = 0;
+				if(o.coins=='--'){
+					o.coins=0;
+				}
+				
+				if(o.credit=='--'){
+					o.credit=0;
+				}
+				
+				saveVideoToDB(o,aid,cb,aidList.length);
+			}else{
+				refreshed=true;
+				request({
+				'url':'http://api.bilibili.com/view'+createUrl(req,aid),
+				},function (err, response, body) {
+					try{
+						var o = JSON.parse(body);
+						if(o.code && (o.code=='-403' || o.code=='-503' )){
+							o.mid = a.mid;
+							o.title = a.title;
+							o.description = a.description;
+							o.created_at = a.created;
+							o.pic = a.pic;
+							o.play = a.play;
+							o.review = a.review;
+							o.video_review = a.video_review;
+							o.favorites = a.favorites;
+							o.coins = 0;
+							o.credit = 0;
+						}
+						
+						if(o.coins=='--'){
+							o.coins=0;
+						}
+						
+						if(o.credit=='--'){
+							o.credit=0;
+						}
+						
+						saveVideoToDB(o,aid,cb,aidList.length);
+						
+					}catch(e){
+						console.log('视频数据出错:'+aid);
+					}
+				});
 			}
 			
-			connection.query("REPLACE INTO video (`aid`,`mid`,`title`,`description`,`created`,`pic`) VALUES (?,?,?,?,?,?);",
-			[aid,o.mid,o.title,o.description,o.created_at,o.pic]
-			,function(err,rows){
-				if(err){
-					console.log(err);
-					console.log(o)
-					console.log('写入视频数据出错：'+aid);
-				}
-			});
 			
-			connection.query("REPLACE INTO video_history (`aid`,`ts`,`play`,`review`,`video_review`,`favorites`,`coins`) VALUES (?,NOW(),?,?,?,?,?)",
-			[aid,o.play,o.review,o.video_review,o.favorites,o.coins],
-			function(err,rows){
-				if(err){
-					console.log(err);
-					console.log(o)
-					console.log('写入视频数据出错：'+aid);
-				}
-			})
-		}catch(e){
-			console.log('视频数据出错:'+aid);
 		}
+	],function(err){
+		if(!refreshed){
+				setTimeout(updateVideos,0,callback);
+		}else{
+			if(downloadNum++%8==0){
+				setTimeout(updateVideos,3500,callback);
+			}else{
+				setTimeout(updateVideos,100,callback);
+			}
+		}
+		
 	});
+	
+	
+	
+	
 }
 
 async.series([
@@ -165,6 +238,7 @@ async.series([
 	},
 	function (callback) {
 		//获得用户视频列表	
+		// 这里已知一个B站的BUG：如果简介之类的地方有双引号，会导致JSON坏掉……
 		async.each(midList,function(mid,cb){
 			request({
 				url:'http://space.bilibili.com/ajax/member/getSubmitVideos?mid='+mid+'&keyword=&page=1'
@@ -184,7 +258,7 @@ async.series([
 						async.each(pages,function(page,cb2){
 							request({
 								url:'http://space.bilibili.com/ajax/member/getSubmitVideos?mid='+mid+'&keyword=&page='+page
-							},function(err,res,body){
+							},function(err,res,body){							
 								try{
 									var o = JSON.parse(body);
 									for(var i=0;i<o.data.vlist.length;i++){
@@ -192,7 +266,8 @@ async.series([
 									}
 									cb2();
 								}catch(e){
-									console.log('视频列表失败：'+mid);
+									console.error(e.stack);
+									console.log('视频列表失败：'+mid+','+page);
 									cb2();
 									return;
 								}
@@ -222,10 +297,6 @@ async.series([
 	function (callback) {
 		//获得视频详细信息并且更新数据库
 		updateVideos(callback);
-	},
-	function (callback) {
-		connection.end();
-		console.log('已经关闭到数据库的连接');
 	}
 ],function(err,results) {
 	console.log('完成');
