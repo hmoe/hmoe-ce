@@ -92,8 +92,8 @@ function saveVideoToDB(o,aid,callback,l){
 
 function updateVideos(callback){
 	if(aidList.length<=0){
-		connection.end();
-		console.log('已经关闭到数据库的连接');
+		//connection.end();
+		//console.log('已经关闭到数据库的连接');
 		callback();
 		return;
 	}
@@ -186,120 +186,130 @@ function updateVideos(callback){
 	
 }
 
-async.series([
-	function (callback) {
-		//更新用户列表
-		connection.query('SELECT * FROM watch', function(err, rows, fields) {
-			if (err) throw err;
-			for(var i=0;i<rows.length;i++){
-				midList.push(rows[i].mid);
-			}
-			console.log('已经从数据库获得监控用户列表');
-			callback();
-		})
-	},
-	function (callback) {
-		//更新用户信息
-		async.each(midList,function(mid,cb){
-			request({
-				url:'http://api.bilibili.cn/userinfo?mid='+mid
-			},function(err,res,body){
-				if(!err && res.statusCode == 200){
-					var o = JSON.parse(body);
-					connection.query("REPLACE INTO up (`mid`,`name`,`face`,`birthday`,`regtime`,`description`,`sign`) \
-					VALUES ("+mid+",'"+o.name+"','"+o.face+"','"+o.birthday+"',"+o.regtime+",'"+o.description+"','"+o.sign+"');"
-					,function(err,rows){
-						if(err){
-							console.error('写入'+mid+'的用户数据时出错');
-						}
-						connection.query("REPLACE INTO up_history (`mid`,`ts`,`coins`,`rank`,`fans`,`friends`) \
-						VALUES ("+mid+",NOW(),'"+o.coins+"','"+o.level_info.current_exp+"',"+o.fans+",'"+o.friend+"');"
+function start(){
+	midList = [];
+	aidList = [];
+	downloadNum = 0;
+	
+	async.series([
+		function (callback) {
+			//更新用户列表
+			connection.query('SELECT * FROM watch', function(err, rows, fields) {
+				if (err) throw err;
+				for(var i=0;i<rows.length;i++){
+					midList.push(rows[i].mid);
+				}
+				console.log('已经从数据库获得监控用户列表');
+				callback();
+			})
+		},
+		function (callback) {
+			//更新用户信息
+			async.each(midList,function(mid,cb){
+				request({
+					url:'http://api.bilibili.cn/userinfo?mid='+mid
+				},function(err,res,body){
+					if(!err && res.statusCode == 200){
+						var o = JSON.parse(body);
+						connection.query("REPLACE INTO up (`mid`,`name`,`face`,`birthday`,`regtime`,`description`,`sign`) \
+						VALUES ("+mid+",'"+o.name+"','"+o.face+"','"+o.birthday+"',"+o.regtime+",'"+o.description+"','"+o.sign+"');"
 						,function(err,rows){
 							if(err){
-								console.log(err)
-								console.error('写入'+mid+'的用户历史数据时出错');
+								console.error('写入'+mid+'的用户数据时出错');
 							}
-							cb();
-						});
-					})
-				}else{
-					console.error('错误，不能获取'+'http://api.bilibili.cn/userinfo?mid='+mid);
-					cb();
-				}
-			});
-		},function(err){
-			if(err){
-				console.error('某些用户信息更新失败');
-			}else{
-				console.log('用户信息更新完成');				
-			}
-			callback();
-		});
-	},
-	function (callback) {
-		//获得用户视频列表	
-		// 这里已知一个B站的BUG：如果简介之类的地方有双引号，会导致JSON坏掉……
-		async.each(midList,function(mid,cb){
-			request({
-				url:'http://space.bilibili.com/ajax/member/getSubmitVideos?mid='+mid+'&keyword=&page=1'
-			},function(err,res,body){
-				try{
-					var o = JSON.parse(body);
-					for(var i=0;i<o.data.vlist.length;i++){
-						aidList.push(o.data.vlist[i]);						
-					}
-					
-					if(o.data.pages>1){
-						var pages = [];
-						for(var i=2;i<=o.data.pages;i++){
-							pages.push(i);
-						}
-						
-						async.each(pages,function(page,cb2){
-							request({
-								url:'http://space.bilibili.com/ajax/member/getSubmitVideos?mid='+mid+'&keyword=&page='+page
-							},function(err,res,body){							
-								try{
-									var o = JSON.parse(body);
-									for(var i=0;i<o.data.vlist.length;i++){
-										aidList.push(o.data.vlist[i]);						
-									}
-									cb2();
-								}catch(e){
-									console.error(e.stack);
-									console.log('视频列表失败：'+mid+','+page);
-									cb2();
-									return;
+							connection.query("REPLACE INTO up_history (`mid`,`ts`,`coins`,`rank`,`fans`,`friends`) \
+							VALUES ("+mid+",NOW(),'"+o.coins+"','"+o.level_info.current_exp+"',"+o.fans+",'"+o.friend+"');"
+							,function(err,rows){
+								if(err){
+									console.log(err)
+									console.error('写入'+mid+'的用户历史数据时出错');
 								}
+								cb();
 							});
-						},function(err){
-							cb();
 						})
 					}else{
+						console.error('错误，不能获取'+'http://api.bilibili.cn/userinfo?mid='+mid);
 						cb();
 					}
-					
-				}catch(e){
-					console.log('视频列表失败：'+mid);
-					cb();
-					return;
+				});
+			},function(err){
+				if(err){
+					console.error('某些用户信息更新失败');
+				}else{
+					console.log('用户信息更新完成');				
 				}
+				callback();
 			});
-		},function(err){
-			if(err){
-				console.error('某些用户视频列表更新失败');
-			}else{
-				console.log('用户视频列表更新完成');				
-			}
-			callback();
-		});
-	},
-	function (callback) {
-		//获得视频详细信息并且更新数据库
-		updateVideos(callback);
-	}
-],function(err,results) {
-	console.log('完成');
-});
+		},
+		function (callback) {
+			//获得用户视频列表	
+			// 这里已知一个B站的BUG：如果简介之类的地方有双引号，会导致JSON坏掉……
+			async.each(midList,function(mid,cb){
+				request({
+					url:'http://space.bilibili.com/ajax/member/getSubmitVideos?mid='+mid+'&keyword=&page=1'
+				},function(err,res,body){
+					try{
+						var o = JSON.parse(body);
+						for(var i=0;i<o.data.vlist.length;i++){
+							aidList.push(o.data.vlist[i]);						
+						}
+						
+						if(o.data.pages>1){
+							var pages = [];
+							for(var i=2;i<=o.data.pages;i++){
+								pages.push(i);
+							}
+							
+							async.each(pages,function(page,cb2){
+								request({
+									url:'http://space.bilibili.com/ajax/member/getSubmitVideos?mid='+mid+'&keyword=&page='+page
+								},function(err,res,body){							
+									try{
+										var o = JSON.parse(body);
+										for(var i=0;i<o.data.vlist.length;i++){
+											aidList.push(o.data.vlist[i]);						
+										}
+										cb2();
+									}catch(e){
+										console.error(e.stack);
+										console.log('视频列表失败：'+mid+','+page);
+										cb2();
+										return;
+									}
+								});
+							},function(err){
+								cb();
+							})
+						}else{
+							cb();
+						}
+						
+					}catch(e){
+						console.log('视频列表失败：'+mid);
+						cb();
+						return;
+					}
+				});
+			},function(err){
+				if(err){
+					console.error('某些用户视频列表更新失败');
+				}else{
+					console.log('用户视频列表更新完成');				
+				}
+				callback();
+			});
+		},
+		function (callback) {
+			//获得视频详细信息并且更新数据库
+			updateVideos(callback);
+		}
+	],function(err,results) {
+		console.log('完成');
+		setTimeout(start,600);
+	});
 
- 
+ 	
+}
+
+
+start();
