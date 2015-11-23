@@ -305,7 +305,7 @@ function start(){
 		}
 	],function(err,results) {
 		console.log('完成');
-		setTimeout(start,600);
+		setTimeout(start,600000);
 	});
 
  	
