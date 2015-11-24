@@ -57,8 +57,51 @@ var aidList = [];
 var downloadNum = 0;
 
 function saveVideoToDB(o,aid,callback,l){
+	var needRefresh = true;
 	
 	async.series([
+		function(cb){
+			if(o.coins == 0 && o.credit == 0 ){
+				connection.query("SELECT * FROM video_history WHERE aid=? and coins=0 and credit=0 ORDER BY ts DESC LIMIT 1",[aid],
+				function(err, rows, fields){
+					if(err){
+						console.error(err);
+						throw err;
+					}
+					
+					if(rows.length == 1){
+						if(rows[0].play == o.play &&
+						rows[0].review == o.review &&
+						rows[0].video_review == o.video_review &&
+						rows[0].favorites == o.favorites){
+							needRefresh = false;
+						}
+					}
+					cb();
+				});
+			}else{
+				connection.query("SELECT * FROM video_history WHERE aid=? and coins!=0 and credit!=0 ORDER BY ts DESC LIMIT 1",[aid],
+				function(err, rows, fields){
+					if(err){
+						console.error(err);
+						throw err;
+					}
+					
+					if(rows.length == 1){
+						if(rows[0].play == o.play &&
+						rows[0].review == o.review &&
+						rows[0].video_review == o.video_review &&
+						rows[0].favorites == o.favorites &&
+						rows[0].coins == o.coins &&
+						rows[0].credit == o.credit){
+							needRefresh = false;
+						}
+					}
+					cb();
+				});
+			}
+			
+		},
 		function(cb){
 			connection.query("REPLACE INTO video (`aid`,`mid`,`title`,`description`,`created`,`pic`) VALUES (?,?,?,?,?,?);",
 			[aid,o.mid,o.title,o.description,o.created_at,o.pic]
@@ -72,6 +115,8 @@ function saveVideoToDB(o,aid,callback,l){
 			});
 		},
 		function(cb){
+			if(!needRefresh)return cb();
+			
 			connection.query("REPLACE INTO video_history (`aid`,`ts`,`play`,`review`,`video_review`,`favorites`,`coins`,`credit`) VALUES (?,NOW(),?,?,?,?,?,?)",
 			[aid,o.play,o.review,o.video_review,o.favorites,o.coins,o.credit],
 			function(err,rows){
@@ -212,26 +257,59 @@ function start(){
 					if(!err && res.statusCode == 200){
 						try{
 							var o = JSON.parse(body);
-							connection.query("REPLACE INTO up (`mid`,`name`,`face`,`birthday`,`regtime`,`description`,`sign`) \
-							VALUES ("+mid+",'"+o.name+"','"+o.face+"','"+o.birthday+"',"+o.regtime+",'"+o.description+"','"+o.sign+"');"
-							,function(err,rows){
-								if(err){
-									console.error('写入'+mid+'的用户数据时出错');
+							var needRefresh = true;
+							async.series([
+								function(cb2){
+									connection.query("SELECT * FROM up_history WHERE mid=? ORDER BY ts DESC LIMIT 1",[mid],
+									function(err, rows, fields){
+										if(err){
+											console.error(err);
+											throw err;
+										}
+										
+										if(rows.length == 1){
+											if(rows[0].coins == o.coins &&
+											rows[0].rank == o.level_info.current_exp &&
+											rows[0].fans == o.fans &&
+											rows[0].friends == o.friend){
+												needRefresh = false;
+											}
+										}
+										cb2();
+									});
+									
+								},
+								function(cb2){
+									connection.query("REPLACE INTO up (`mid`,`name`,`face`,`birthday`,`regtime`,`description`,`sign`) VALUES (?,?,?,?,?,?,?);",
+									[mid,o.name,o.face,o.birthday,o.regtime,o.description,o.sign],
+									function(err,rows){
+										if(err){
+											console.error(err);
+											console.error('写入'+mid+'的用户数据时出错');
+										}
+										cb2();
+									})
+								},
+								function(cb2){
+									if(!needRefresh)return cb2();
+									
+									connection.query("REPLACE INTO up_history (`mid`,`ts`,`coins`,`rank`,`fans`,`friends`) VALUES (?,NOW(),?,?,?,?);",
+									[mid,o.coins,o.level_info.current_exp,o.fans,o.friend],
+									function(err,rows){
+										if(err){
+											console.log(err)
+											console.error('写入'+mid+'的用户历史数据时出错');
+										}
+										cb2();
+									});
 								}
-								connection.query("REPLACE INTO up_history (`mid`,`ts`,`coins`,`rank`,`fans`,`friends`) \
-								VALUES ("+mid+",NOW(),'"+o.coins+"','"+o.level_info.current_exp+"',"+o.fans+",'"+o.friend+"');"
-								,function(err,rows){
-									if(err){
-										console.log(err)
-										console.error('写入'+mid+'的用户历史数据时出错');
-									}
-									cb();
-								});
-							})	
+							],function(err){
+								cb();
+							});
 						}catch(e){
 							console.error('错误，不能获取'+'http://api.bilibili.cn/userinfo?mid='+mid);
 							cb();
-						}
+						}		
 					}else{
 						console.error('错误，不能获取'+'http://api.bilibili.cn/userinfo?mid='+mid);
 						cb();
