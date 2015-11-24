@@ -210,23 +210,28 @@ function start(){
 					url:'http://api.bilibili.cn/userinfo?mid='+mid
 				},function(err,res,body){
 					if(!err && res.statusCode == 200){
-						var o = JSON.parse(body);
-						connection.query("REPLACE INTO up (`mid`,`name`,`face`,`birthday`,`regtime`,`description`,`sign`) \
-						VALUES ("+mid+",'"+o.name+"','"+o.face+"','"+o.birthday+"',"+o.regtime+",'"+o.description+"','"+o.sign+"');"
-						,function(err,rows){
-							if(err){
-								console.error('写入'+mid+'的用户数据时出错');
-							}
-							connection.query("REPLACE INTO up_history (`mid`,`ts`,`coins`,`rank`,`fans`,`friends`) \
-							VALUES ("+mid+",NOW(),'"+o.coins+"','"+o.level_info.current_exp+"',"+o.fans+",'"+o.friend+"');"
+						try{
+							var o = JSON.parse(body);
+							connection.query("REPLACE INTO up (`mid`,`name`,`face`,`birthday`,`regtime`,`description`,`sign`) \
+							VALUES ("+mid+",'"+o.name+"','"+o.face+"','"+o.birthday+"',"+o.regtime+",'"+o.description+"','"+o.sign+"');"
 							,function(err,rows){
 								if(err){
-									console.log(err)
-									console.error('写入'+mid+'的用户历史数据时出错');
+									console.error('写入'+mid+'的用户数据时出错');
 								}
-								cb();
-							});
-						})
+								connection.query("REPLACE INTO up_history (`mid`,`ts`,`coins`,`rank`,`fans`,`friends`) \
+								VALUES ("+mid+",NOW(),'"+o.coins+"','"+o.level_info.current_exp+"',"+o.fans+",'"+o.friend+"');"
+								,function(err,rows){
+									if(err){
+										console.log(err)
+										console.error('写入'+mid+'的用户历史数据时出错');
+									}
+									cb();
+								});
+							})	
+						}catch(e){
+							console.error('错误，不能获取'+'http://api.bilibili.cn/userinfo?mid='+mid);
+							cb();
+						}
 					}else{
 						console.error('错误，不能获取'+'http://api.bilibili.cn/userinfo?mid='+mid);
 						cb();
