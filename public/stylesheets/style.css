@@ -1,8 +1,88 @@
 body {
   padding: 50px;
   font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+  background-image: url("http://kami.im/img/Konachan.jpg");
+  background-attachment: fixed;
+  background-size: cover;
+  padding: 5%;
+  font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;
+  -moz-user-select: none;
+  -o-user-select:none;
+  -khtml-user-select:none;
+  -webkit-user-select:none;
+  -ms-user-select:none;
+}
+
+#content{
+  background: rgba(255, 255, 255, 0.4);
+  width: 90%;
+  min-height: 400px;
+  border-radius: 20px;
+  padding: 5%;
+  border:rgba(0,200,255,0.2) 2px solid;
+  display: none;
+}
+
+footer{
+  background: rgba(255, 204, 204, 0.6);
+  position: fixed;
+  bottom: 0;
+  width: 80%;
+  height: 42px;
+  padding-left: 5%;
+  padding-right: 5%;
+}
+
+footer audio{
+  position: absolute;
+  bottom: 5px;
+}
+
+footer p{
+  float: right;
+  height: 42px;
 }
 
 a {
-  color: #00B7FF;
+  color: black;
+}
+
+.clear{
+  clear: both;
+}
+
+.up-list{
+  text-align: center;
+}
+
+.up-info{
+  height: 200px;
+  width: 140px;
+  margin: 18px;
+  padding: 5px;
+  background: rgba(255,255,255,0.8);
+  border-radius: 5px;
+  border:rgba(0,200,255,0.2) 2px solid;
+  overflow: hidden;
+  text-align: center;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.up-face{
+  height: 100px;
+  width: 100px;
+  display: block;
+  border-radius: 50px;
+  margin: auto;
+}
+
+.up-name{
+  font-size: 18px;
+  margin: 6px;
+}
+
+.up-sign{
+  color: gray;
+  font-size: 12px;
 }

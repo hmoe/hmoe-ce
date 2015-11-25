@@ -88,3 +88,11 @@ function onListening() {
     : 'port ' + addr.port;
   debug('Listening on ' + bind);
 }
+
+
+global.db = {
+  host     : 'localhost',
+  user     : 'root',
+  password : 'password',
+  database : 'hmoe_ce'
+};
