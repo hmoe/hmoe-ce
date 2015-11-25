@@ -329,7 +329,7 @@ function start(){
 			// 这里已知一个B站的BUG：如果简介之类的地方有双引号，会导致JSON坏掉……
 			async.each(midList,function(mid,cb){
 				request({
-					url:'http://space.bilibili.com/ajax/member/getSubmitVideos?mid='+mid+'&keyword=&page=1'
+					url:'http://space.bilibili.com/ajax/member/getSubmitVideos?mid='+mid+'&keyword=&page=1&pagesize=100'
 				},function(err,res,body){
 					try{
 						var o = JSON.parse(body);
@@ -345,7 +345,7 @@ function start(){
 							
 							async.each(pages,function(page,cb2){
 								request({
-									url:'http://space.bilibili.com/ajax/member/getSubmitVideos?mid='+mid+'&keyword=&page='+page
+									url:'http://space.bilibili.com/ajax/member/getSubmitVideos?mid='+mid+'&keyword=&page='+page+'&pagesize=100'
 								},function(err,res,body){							
 									try{
 										var o = JSON.parse(body);
@@ -388,7 +388,7 @@ function start(){
 		}
 	],function(err,results) {
 		console.log('完成');
-		setTimeout(start,600000);
+		connection.end();
 	});
 
  	
