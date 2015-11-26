@@ -86,3 +86,54 @@ a {
   color: gray;
   font-size: 12px;
 }
+
+#up-screen{
+  width: 100%;
+}
+
+#up-screen-info{
+  width: 100%;
+  cursor: pointer;
+}
+
+#up-screen-info .up-face{
+  margin:0;
+  float: right;
+}
+
+.video-list-container{
+  margin-top: 20px;
+  width: 100%;
+  border:rgba(0,200,255,0.2) 2px solid;
+  background: rgba(255,255,255,0.8);
+  border-radius: 20px;
+  height: 100px;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.video-list-container img{
+  float: left;
+  height: 100px;
+  width: 160px;
+  padding-right: 10px;
+}
+.video-list-container h4{
+  margin: 5px;
+}
+
+.video-list-container h6{
+  margin: 5px;
+}
+
+.video-list-container p{
+  margin: 5px;
+}
+
+.echarts-container{
+  height: 480px;
+}
+
+#up-data-container,#video-data-container{
+  width: 100%;
+}
