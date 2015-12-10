@@ -143,67 +143,53 @@ function updateVideos(callback){
 		return;
 	}
 	
-	var refreshed = false;
+
 	
 	async.series([
 		function(cb){
 			var a = aidList.pop();
 			var aid = a.aid;
-			var dd = new Date().getTime() - Date.parse(a.created);
-			
-			//如果投稿日期超过一个星期，不更新
-			if(( dd > 1000*3600*24*7)){
-				cb();
-			}else{
-				refreshed=true;
-				request({
-				'url':'http://api.bilibili.com/view'+createUrl(req,aid),
-				},function (err, response, body) {
-					try{
-						var o = JSON.parse(body);
-						if(o.code && (o.code=='-403' || o.code=='-503' )){
-							o.mid = a.mid;
-							o.title = a.title;
-							o.description = a.description;
-							o.created_at = a.created;
-							o.pic = a.pic;
-							o.play = a.play;
-							o.review = a.review;
-							o.video_review = a.video_review;
-							o.favorites = a.favorites;
-							o.coins = 0;
-							o.credit = 0;
-						}
-						
-						if(o.coins=='--'){
-							o.coins=0;
-						}
-						
-						if(o.credit=='--'){
-							o.credit=0;
-						}
-						
-						saveVideoToDB(o,aid,cb,aidList.length);
-						
-					}catch(e){
-						console.log('视频数据出错:'+aid);
+
+			request({
+			'url':'http://api.bilibili.com/view'+createUrl(req,aid),
+			},function (err, response, body) {
+				try{
+					var o = JSON.parse(body);
+					if(o.code && (o.code=='-403' || o.code=='-503' )){
+						o.mid = a.mid;
+						o.title = a.title;
+						o.description = a.description;
+						o.created_at = a.created;
+						o.pic = a.pic;
+						o.play = a.play;
+						o.review = a.review;
+						o.video_review = a.video_review;
+						o.favorites = a.favorites;
+						o.coins = 0;
+						o.credit = 0;
 					}
-				});
-			}
-			
-			
+					
+					if(o.coins=='--'){
+						o.coins=0;
+					}
+					
+					if(o.credit=='--'){
+						o.credit=0;
+					}
+					
+					saveVideoToDB(o,aid,cb,aidList.length);
+					
+				}catch(e){
+					console.log('视频数据出错:'+aid);
+				}
+			});			
 		}
 	],function(err){
-		if(!refreshed){
-				setTimeout(updateVideos,0,callback);
+		if(downloadNum++%8==0){
+			setTimeout(updateVideos,3500,callback);
 		}else{
-			if(downloadNum++%8==0){
-				setTimeout(updateVideos,3500,callback);
-			}else{
-				setTimeout(updateVideos,100,callback);
-			}
+			setTimeout(updateVideos,100,callback);
 		}
-		
 	});
 	
 	
